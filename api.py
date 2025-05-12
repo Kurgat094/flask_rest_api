@@ -30,7 +30,14 @@ user_args=reqparse.RequestParser()
 user_args.add_argument('name',type=str,required=True, help="Name cannot be blank")
 user_args.add_argument('email',type=str,required=True,help="Email cannot be blank")
 user_args.add_argument('password',type=str,required=True,help="Password cannot be blank")
+# Register args
+register_args=reqparse.RequestParser()
+register_args.add_argument('name',type=str,required=True,help="Name cannot be blank")   
+register_args.add_argument('email',type=str,required=True,help="Email cannot be blank")
+register_args.add_argument('password',type=str,required=True,help="Password cannot be blank")
+register_args.add_argument('confirm_password',type=str,required=True,help="Confirm Password cannot be blank")
 
+# Login args
 login_args=reqparse.RequestParser()
 login_args.add_argument('email',type=str,required=True,help="Email cannot be blank")
 login_args.add_argument('password',type=str,required=True,help="Password Is Required")
@@ -106,6 +113,43 @@ class User(Resource):
         db.session.commit()
         users=UserModel.query.all()
         return users,204
+
+# Register Resource
+class Register(Resource):
+    @marshal_with(userFields)
+    def post(self):
+        args = register_args.parse_args()
+        # Create a new user
+        user = UserModel(name=args.name, email=args.email, password=args.password)
+        
+        # Hash the password
+        user.hash_password()
+        
+        # Check if the user already exists
+        existing_user = UserModel.query.filter_by(email=args.email).first()
+        if existing_user:
+            abort(400, description="A user with this email already exists.")
+        
+        # Check if the name already exists
+        existing_user = UserModel.query.filter_by(name=args.name).first()
+        if existing_user:
+            abort(400, description="A user with this name already exists.")
+        
+        # Save the new user to the database
+        db.session.add(user)
+        db.session.commit()
+        
+        # Return a success message with user details
+        return {
+            "message": "Registration successful!",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email
+            }
+        }, 201
+
+# Login Resource
 class Login(Resource):
     def post(self):
         args=login_args.parse_args()
@@ -119,6 +163,7 @@ class Login(Resource):
 api.add_resource(Users, '/api/users/')
 api.add_resource(User, '/api/users/<int:id>', endpoint='user_by_id')
 api.add_resource(Login, '/api/login/', endpoint='user_login')
+api.add_resource(Register, '/api/register/', endpoint='user_register')
 
 @app.route('/')
 def home():
